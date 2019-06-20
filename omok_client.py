@@ -27,17 +27,32 @@ class OmokClient():
         self.PORT = 10000
         self.ADDR = (self.HOST, self.PORT)
 
-    def recvProgress(self, sock, run):
+    def recvProgress(self, sock, run):    # while문을 없애고 밑에 putrock, scanrock에대한 스레드를 구현해서 다시해보자
         while True:
             try:
                 clickedPoint = sock.recv(1024)
                 if not clickedPoint:
                     break
+                if clickedPoint.decode() == 'end':
+                    sock.shutdown()
+                    sock.close()
                 if clickedPoint:
                     print(tuple(clickedPoint))
                     run.putothersRock(clickedPoint)
+
             except Exception as e:
                 print("recv Progrss ERROR : ", e)
+
+
+    '''
+    def startGame(self, color, sock):
+        run = omok(color=color, sock=sock)
+        run.makeGround()
+        while True:
+            run.putRock()
+    '''
+    def sendProgress(self, run):
+        run.putRock()
 
     def connectServer(self):
         '''
@@ -60,18 +75,28 @@ class OmokClient():
             try:
                 sock.connect(self.ADDR)
                 color = sock.recv(1024).decode().strip()
-                run = omok(color, sock)
-
+                print(color)
+                run = omok(color=color, sock=sock)
                 # 상대편 돌을 받기 위한 스레드
-                t = Thread(target=self.recvProgress, args=(sock, run))
-                t.daemon = True
-                t.start()
+                t1 = Thread(target=self.recvProgress, args=(sock, run))
+                t1.daemon = True
+                t1.start()
 
-                run.run()
+                run.makeGround()
+                while True:
+                    if run.turn:
+                        run.putRock()
+                    else:
+                        time.sleep(1)
+
+
+
+
             except Exception as e:
                 print("connection ERROR")
                 print("MESSAGE : ", e)
                 sys.exit()
+
 
 
 
@@ -80,6 +105,7 @@ def run():
     client.connectServer()
     while True:
         time.sleep(1)
+
 
 
 if __name__ == "__main__":

@@ -3,21 +3,26 @@ from tkinter import *
 import tkinter.messagebox
 #from mttkinter.mtTkinter import *
 import numpy as np
+from threading import Lock, Thread
 
+lock = Lock()
 
 
 
 class omok():
-    def __init__(self, color, sock):
+    def __init__(self, color=None, sock=None):
         self.minPoint = 10
         self.maxPoint = 550
         self.winNum = {(0, 0): [1, ""]}
+        self.ptlst = np.zeros((19,19))
+        if color is None and sock is None:
+            return
         self.window = GraphWin(width=560, height=560)
         self.makeGround()
         self.turn = 0
-        self.ptlst = np.zeros((19,19))
         self.myColor = color
         self.sock = sock
+        self.clickedpoint = None
         if self.myColor == 'black':
             self.rockColor = 1
             self.turn = 1
@@ -60,29 +65,29 @@ class omok():
 
 
     def putRock(self):
-        while True:
-            #self.chkTurn(self.turn)
-            clickPoint = self.window.getMouse()
-            clickPoint = self.adjustPoint(clickPoint)
-            x = int((clickPoint.getX() - 10 ) / 30)
-            y = int((clickPoint.getY() - 10 ) / 30)
-            clickedPoint = (x,y)
-
-            if self.ptlst[x,y]:
-                print('there has already sat rock')
-            else:
-                self.ptlst[x,y] = self.rockColor
-                self.drawRock(self.myColor, clickPoint)
-                self.sock.send(bytes((x, y, self.rockColor)))  # 상대편에 턴을 준다고 알려주는 신호
-                #if self.scanRocks(clickedPoint):
-                #    print(self.myColor, "is winner!")
-                #    return True
-                #else: return False
+        #self.chkTurn(self.turn)
+        clickPoint = self.window.getMouse()
+        clickPoint = self.adjustPoint(clickPoint)
+        x = int((clickPoint.getX() - 10 ) / 30)
+        y = int((clickPoint.getY() - 10 ) / 30)
+        clickedPoint = (x,y)
+        if self.ptlst[x,y]:
+            print('there has already sat rock')
+            return None
+        else:
+            print(self.rockColor)
+            self.ptlst[x,y] = self.rockColor
+            self.drawRock(self.myColor, clickPoint)
+            self.sock.send(bytes((x, y, self.rockColor, 1)))  # 상대편에 턴을 준다고 알려주는 신호
+            self.turn = 0
+            self.clickedpoint = clickedPoint
+            return clickedPoint
 
     def putothersRock(self, clickedpoint):
         x = clickedpoint[0]
         y = clickedpoint[1]
         color = clickedpoint[2]
+        self.turn = 1
         mycolor = ""
         if color == 1:
             mycolor = 'black'
@@ -90,7 +95,6 @@ class omok():
             mycolor = 'white'
         else:
             print('누구냐..넌...')
-
         if self.ptlst[x,y]:
             print('there has already sat rock')
         else:
@@ -100,7 +104,6 @@ class omok():
 
 
     def drawRock(self, myColor, p):
-        print(p)
         draw = Circle(p, 15)
         draw.setFill(myColor)
         draw.draw(self.window)
@@ -122,6 +125,8 @@ class omok():
         pass
 
     def scanRocks(self, clickedPoint):
+        if clickedPoint is None:
+            return False
         idx_x = clickedPoint[0]
         idx_y = clickedPoint[1]
         EOleft = EOright = EOup = EOdown = EOleftdown = EOrightup = EOleftup = EOrightdown = False
@@ -236,14 +241,23 @@ class omok():
             for i in ["LtoR", "UtoD", "toUpRight", "toDownRight"]:
                 if self.winNum[clickedPoint, i][0] >= 5:  # 모든방향을 체크해서 돌이 5개이상 같은 색으로 나열되어있으면 승리.
                     #tkinter.messagebox.showinfo("Game Over!!", "%d Player가 이겼습니다!!!" % rockColor)
-                    print("Winner : ", rockColor, self.winNum)
+                    if rockColor == 1: rockColor = "흑돌"
+                    if rockColor == 2: rockColor = "백돌"
+                    print("Winner : ", rockColor)
                     return True
         return False
 
     def run(self):
+        pass
+        '''
         while True:
-            newGame = self.putRock()
-            if newGame:
-                print('game over')
+            if self.turn == 0:
+                time.sleep(1)
+                continue
+            lock.acquire()
+            clickedpoint = self.putRock()
+            lock.release()
+            if self.scanRocks(clickedpoint):
                 break
-        self.window.mainloop()
+        print('Game Over')
+        '''

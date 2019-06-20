@@ -10,10 +10,12 @@ ADDR = (HOST, PORT)
 
 class user:
     def __init__(self):
-        self.numUsers = 0
+        self.numUsers = -1
         self.users = {}
 
     def setUserColor(self, conn):
+        if self.numUsers == -1:
+            self.numUsers = 0
         if self.numUsers == 0:
             self.numUsers += 1
             conn.send('black'.encode())
@@ -39,6 +41,7 @@ class user:
 
 class OmokTCPHandler(socketserver.BaseRequestHandler):
     users = user()
+    game = omok_run.omok()
     def chk_quit(self, msg):
         if msg[0] != '/quit':
             return False
@@ -60,11 +63,18 @@ class OmokTCPHandler(socketserver.BaseRequestHandler):
 
         print('connection end : ', self.client_address[0])
         '''
+        print("connected")
         self.users.setUserColor(self.request)
         ClickedPoint = self.request.recv(1024)
         while ClickedPoint:
-            print(tuple(ClickedPoint))
+            #print(tuple(ClickedPoint))
+            x = tuple(ClickedPoint)[0]
+            y = tuple(ClickedPoint)[1]
+            color = tuple(ClickedPoint)[2]
+            self.game.ptlst[x, y] = color
             self.users.sendtoOther(self.request, ClickedPoint)
+            if self.game.scanRocks((x,y)):
+                self.request.send('end'.encode())
             ClickedPoint = self.request.recv(1024)
 
 
